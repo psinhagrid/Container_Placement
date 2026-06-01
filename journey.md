@@ -212,3 +212,58 @@ Training data from v6 = few ETD violations in features → XGBoost has little to
 Fix: regenerate training data using GREEDY (which makes random ETD/vessel mistakes) → more variance → XGBoost learns stronger ETD/vessel signal.
 
 **Decision: Regenerate training data with greedy, retrain XGBoost.**
+
+---
+
+### Phase 2 — Attempt 3: Greedy Training Data + Min-Height Only Candidates
+
+**Changes:**
+- Regenerated training data using GreedyCollector (greedy makes more ETD/vessel mistakes → more signal variance)
+- Fixed XGBoost candidate selection: only score stacks at exact min_height (not min_height+1)
+
+**Training result:**
+- Val RMSE: 0.7004 (worse than v6 data — greedy data has more noise)
+- Feature importances more balanced: stack_height 49%, days_until_dep 9%, block_occ 9%, top_etd_gap_days 8%
+
+**Simulation result on train data:**
+- Reshuffles/retrieval: **0.7691** — best result overall, beats greedy (0.7873)
+- Score: **11.3 / 40**
+
+---
+
+## Phase 2 — Summary
+
+| Attempt | Train score | Notes |
+|---|---|---|
+| Greedy baseline | 0.7873 | Reference |
+| XGBoost (v6 data, 400 trees) | 0.7808 | First to beat greedy |
+| XGBoost (v6 data, early stop) | 0.7897 | Early stopping hurt |
+| XGBoost (greedy data, min_h only) | **0.7691** | Best — 11.3/40 |
+
+**Phase 2 conclusion:**
+XGBoost as a tiebreaker among shortest stacks beats greedy, but only marginally (1.3/30 pts vs ~0/30 for greedy). The fundamental ceiling: XGBoost learns "shorter = better" (54%+ importance on stack_height) which greedy already handles perfectly. No amount of XGBoost tuning will reach the 17-21 pts range (0.30-0.40 reshuffles/retrieval).
+
+**The gap to 0.30-0.40 requires changing the placement LOGIC, not the scoring model.**
+LOAD events = 75% of retrievals. If same-vessel containers are grouped and weight-ordered, LOAD reshuffles → ~0. That alone gets to 0.20-0.35.
+
+---
+
+## Phase 3: Departure-Time Aware Placement
+
+**Goal:** Reach 0.30–0.40 reshuffles/retrieval (17–21 pts) by:
+1. Reading vessel schedule → assign each vessel rotation to a dedicated block
+2. Within block: enforce strict weight ordering (HEAVY on top, always)
+3. Avoid initial-state contaminated stacks — only build on empty/clean stacks
+4. XGBoost as final tiebreaker within same-vessel equal-height stacks
+
+**Why this works:**
+- LOAD events (75% of retrievals): all same-vessel containers in same block, weight-ordered → 0 reshuffles
+- TRUCK_DLVR (25%): still greedy-level, can't control much
+
+**Expected score:** 17–21 pts for reshuffles + 10 pts violations = 27–31 / 40
+
+---
+
+### Phase 3 — Attempt 1: Vessel-Block Assignment + Weight Ordering + Initial-State Avoidance
+
+*Result pending...*
