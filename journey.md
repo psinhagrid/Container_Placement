@@ -302,3 +302,50 @@ Previous phases tried to score or group containers heuristically. The fundamenta
 ### Phase 4 — Attempt 1: CP-SAT block assignment + vessel+port grouping
 
 *Result pending...*
+
+---
+
+## Phase 4 — Summary: All Grouping Approaches Failed
+
+**Every grouping approach (vessel+port, block assignment, OR-Tools) scored worse than greedy (0.7873 train).**
+
+Root cause: Initial state has 4800 containers taking ~80% of empty stacks in each block. When empty stacks run out, greedy fallback fires and places containers on group stacks → contaminates group purity → reshuffles.
+
+Key constraint: Initial state is FIXED INPUT. Cannot be changed by our algorithm.
+
+**Wrong assumption we had:** Height must be minimized (like greedy). This is wrong.
+Tall stacks with PERFECT ETD ordering beat short stacks with random ordering.
+A height-5 stack where each container is retrieved top→bottom → 0 reshuffles.
+A height-2 stack with wrong order → 1 reshuffle per retrieval.
+
+---
+
+## Phase 5: ETD-Smart Strategy (Minimum-Violation Fallback)
+
+**Core insight:**
+For 0 reshuffles when container X is retrieved: X must be on TOP at retrieval time.
+This happens if every container placed above X has ETD ≤ X.etd (retrieved before X).
+
+If all stacks maintain decreasing ETD from bottom to top → 0 reshuffles for ALL retrievals.
+
+**Why previous ETD approaches failed:**
+When no ETD-compatible stack existed, we fell to GREEDY fallback (random shortest stack).
+Greedy ignores violation SIZE — might pick a stack with 10-day violation vs a stack with 1-day violation.
+A 10-day violation guarantees a reshuffle. A 1-hour violation is nearly harmless.
+
+**The fix: Minimum-Violation Fallback**
+
+Pass 1: ETD-compatible stacks (top_etd ≥ inc_etd) + weight-compatible → shortest, vessel tiebreaker
+Pass 2: Empty stacks (no ETD constraint, always safe)
+Pass 3: Minimum-violation fallback → stack with smallest (violation_days + height) score
+Pass 4: Pure greedy (absolute last resort)
+
+**Expected math:**
+  - Initial state generates ~2500 reshuffles (fixed, can't control)
+  - Our ~6400 new containers: if 80% use Pass 1/2 (0 reshuffles), 20% use Pass 3 (small violations ~0.5):
+  - Our reshuffles: 6400 × 0.20 × 0.5 = 640
+  - Total: (2500 + 640) / 9647 = 0.325 → 17 pts reshuffles + 10 = 27 total
+
+### Phase 5 — Attempt 1: ETD-Smart with Minimum-Violation Fallback
+
+*Result pending...*

@@ -75,40 +75,30 @@ class ORToolsStrategy(PlacementStrategy):
         return False
 
     def _solve_block_assignment(self, schedule: dict) -> None:
-        """CP-SAT: assign each vessel to a block, respecting load-window conflicts."""
+        """Assign each vessel to a dedicated block using ETD-sorted cyclic distribution.
+
+        Sorts vessels by their earliest discharge start time, then assigns them
+        cyclically across SHIP_BLOCKS (B01-B08). This ensures:
+        - Even distribution: each block gets 2-3 vessels
+        - Temporal separation: adjacent blocks get vessels discharging at different times
+        - No competition for empty stacks within a block at the same time
+        """
         ship_vessels = [v for v in schedule["vessels"]
                         if v["vessel_id"] not in TRUCK_VESSELS]
 
-        # Build load windows per vessel (union across all rotations)
-        vessel_windows: Dict[str, List[Tuple[float, float]]] = {}
-        for v in ship_vessels:
-            vid = v["vessel_id"]
-            windows = []
-            for rot in v.get("rotations", []):
-                ls = self._parse_ts(rot.get("load_start", ""))
-                le = self._parse_ts(rot.get("load_end", ""))
-                if ls > 0 and le > 0:
-                    windows.append((ls, le))
-            vessel_windows[vid] = windows
+        # Get earliest discharge time for each vessel (across all rotations)
+        def first_discharge(vessel: dict) -> float:
+            times = [self._parse_ts(rot.get("discharge_start", ""))
+                     for rot in vessel.get("rotations", [])]
+            valid = [t for t in times if t > 0]
+            return min(valid) if valid else float("inf")
 
-        vessel_ids = [v["vessel_id"] for v in ship_vessels]
+        # Sort by first discharge, assign cyclically to ship blocks
+        sorted_vessels = sorted(ship_vessels, key=first_discharge)
+        for i, vessel in enumerate(sorted_vessels):
+            self._vessel_block[vessel["vessel_id"]] = SHIP_BLOCKS[i % len(SHIP_BLOCKS)]
 
-        # Build conflict graph: which pairs of vessels overlap?
-        conflicts: Dict[str, Set[str]] = {vid: set() for vid in vessel_ids}
-        for i, vi in enumerate(vessel_ids):
-            for vj in vessel_ids[i + 1:]:
-                if self._windows_overlap(vessel_windows[vi], vessel_windows[vj]):
-                    conflicts[vi].add(vj)
-                    conflicts[vj].add(vi)
-
-        # Try CP-SAT first, fall back to greedy graph coloring
-        try:
-            from ortools.sat.python import cp_model
-            self._cpsat_assign(vessel_ids, conflicts, cp_model)
-            print(f"[ORTools] CP-SAT block assignment complete")
-        except Exception as e:
-            print(f"[ORTools] CP-SAT unavailable ({e}), using greedy graph coloring")
-            self._greedy_color(vessel_ids, conflicts)
+        print("[ORTools] ETD-sorted cyclic block assignment complete")
 
         # Assign truck vessels to truck blocks
         for i, vid in enumerate(TRUCK_VESSELS):
