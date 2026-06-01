@@ -349,3 +349,63 @@ Pass 4: Pure greedy (absolute last resort)
 ### Phase 5 — Attempt 1: ETD-Smart with Minimum-Violation Fallback
 
 *Result pending...*
+
+**Result on train data:**
+- Reshuffles/retrieval: **0.9043** — worse than greedy (0.7873) and XGBoost
+- Train and test scores identical (0.9043 vs 0.9043) — test initial state is NOT cleaner
+
+**Why the math was off:**
+Pass 2 (empty stacks) runs out after ~5,244 placements (not 80% of placements).
+Pass 3 (min violation) picks TALLER stacks than greedy → more containers below us → more reshuffles.
+The math assumed 80% of placements use Pass 1/2 — actual was closer to 30%.
+
+---
+
+## Phase 5 — Attempt 2: Precomputed Min-ETD Strategy
+
+**New insight:** We know ALL 4,800 initial containers and their positions in `initialize()` BEFORE event 1.
+We precompute `stack_min_etd[(block,bay,row)]` = minimum ETD of any container in each stack.
+This gives O(1) safety check: if stack_min_etd >= inc_etd → safe (0 reshuffles we add).
+Live updates: `on_container_retrieved()` recomputes min_etd when containers leave.
+
+**Result on train data:** 0.8357 reshuffles/retrieval
+**Result on test data:** 0.8358 reshuffles/retrieval (identical — test initial state has same mixed ETD distribution)
+
+**Why test ≠ better:** Test initial state containers have ETDs in Jan 21–Feb 9 range. New containers also arrive for Jan 21–Feb 9 vessels. Still plenty of conflicts (e.g., Jan 22 top vs Jan 25 incoming = still unsafe). The test data is NOT significantly cleaner for our checks.
+
+---
+
+## Phase 5 — Attempt 3: Ranked Strategy (Exact Retrieval Order)
+
+**Root cause of all failures identified:**
+min_etd and ETD ordering treat all same-vessel containers as equal (same ETD).
+But the problem spec says LOAD retrieves: **port-by-port, within each port HEAVY→MEDIUM→LIGHT**.
+Two containers from the SAME vessel (same ETD) but different ports/weights are retrieved in a KNOWN order.
+
+**The fix:** Assign every container a retrieval rank using vessel schedule:
+```
+rank_score = etd_seconds + port_idx * 200 + weight_offset * 60
+
+port_idx    = position of port in vessel's ports array (0=first port loaded)
+weight_offset = HEAVY:0, MEDIUM:1, LIGHT:2
+```
+
+For VSL001 with ports [PORT_01, PORT_03, PORT_04]:
+- PORT_01/HEAVY: rank = etd + 0    (retrieved FIRST → on TOP)
+- PORT_01/MEDIUM: rank = etd + 60
+- PORT_01/LIGHT:  rank = etd + 120
+- PORT_03/HEAVY:  rank = etd + 200
+- PORT_03/LIGHT:  rank = etd + 320
+- PORT_04/LIGHT:  rank = etd + 520  (retrieved LAST → at BOTTOM)
+
+Stack is SAFE for incoming (rank R) if stack_min_rank >= R.
+As containers are retrieved, stack_min_rank rises → more stacks become safe.
+
+**Also cleaned up dead code (deleted):**
+lookahead_strategy.py, ortools_strategy.py, vessel_port_strategy.py, etd_smart_strategy.py, departure_time_strategy.py
+
+**Created TODO.md** tracking all remaining improvements.
+
+### Phase 5 — Attempt 3: Ranked Strategy
+
+*Result pending...*
