@@ -28,7 +28,28 @@ The vessel grouping bonus (+150) was far stronger than the weight ordering penal
 - Weight bad: -500 (strict — never place lighter on heavier for ship vessels)
 - Same vessel (top): +80 (reduced, now a tiebreaker)
 - Height penalty: -25 (stronger)
-- Block occupancy cached per call (performance fix)
+- Block occupancy cached per call → 6x speed improvement (260s → 43s)
 - Truck vessels (VSL019/020) skip weight ordering (no HEAVY-first loading)
+
+**Result on train data:**
+- Reshuffles/retrieval: **0.9525** — identical to Attempt 1, no improvement
+
+**What went wrong:**
+Weight changes had zero effect. Root cause identified by comparing with greedy baseline (0.7873 on train): we were scanning **all tiers** in each stack for ETD violations. Since the initial 4800 containers have mixed ETDs across tiers, almost every non-empty stack got a -1000 penalty and was rejected. We always fell back to empty stacks, and always picked the **first empty slot in B01** (iteration order bias). Result: all containers piled into B01 sequentially, leaving other blocks empty. Greedy's balanced distribution was better.
+
+**Key insight**: Trial and error on weights is wrong. Weights are NOT the problem — the logic is. XGBoost will learn weights from data in Phase 2 anyway.
+
+---
+
+## Attempt 3: Fix the Logic Bug — Check Only Top Container
+
+**Root cause fix**: Only the TOP container matters for a placement decision. We place on top of the stack — the top container is the only one directly interacting with our placement. Lower tiers are irrelevant (we can't change them, and they don't block our container).
+
+**Changes:**
+- Removed the full-stack tier scan — now only look at top container
+- ETD and weight checks become hard `continue` (skip stack) not score penalties
+- Added proportional block occupancy spread (`-20 * occ_ratio`) so empty stacks in different blocks are not treated equally — distributes load across all 10 blocks
+- ETD proximity reward: prefer stacks where top ETD is close to ours (tighter cluster)
+- Weights: same vessel +200, same port +80, correct weight +50, height -15/tier
 
 *Result pending...*
