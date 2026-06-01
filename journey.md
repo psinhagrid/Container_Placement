@@ -43,13 +43,95 @@ Weight changes had zero effect. Root cause identified by comparing with greedy b
 
 ## Attempt 3: Fix the Logic Bug — Check Only Top Container
 
-**Root cause fix**: Only the TOP container matters for a placement decision. We place on top of the stack — the top container is the only one directly interacting with our placement. Lower tiers are irrelevant (we can't change them, and they don't block our container).
+**Root cause fix**: Only the TOP container matters for a placement decision.
 
 **Changes:**
-- Removed the full-stack tier scan — now only look at top container
-- ETD and weight checks become hard `continue` (skip stack) not score penalties
-- Added proportional block occupancy spread (`-20 * occ_ratio`) so empty stacks in different blocks are not treated equally — distributes load across all 10 blocks
-- ETD proximity reward: prefer stacks where top ETD is close to ours (tighter cluster)
-- Weights: same vessel +200, same port +80, correct weight +50, height -15/tier
+- Removed full-stack tier scan — only look at top container
+- ETD and weight checks become hard `continue` (skip stack entirely)
+- Proportional block occupancy spread, ETD proximity reward
+- Weights: same vessel +200, same port +80, height -15/tier
 
-*Result pending...*
+**Result on train data:**
+- Reshuffles/retrieval: **0.9477** — tiny improvement, still worse than greedy
+
+**What went wrong:**
+Same problem: vessel bonus (+200) still dominated height penalty (-15). Built tall same-vessel stacks even though logic was cleaner.
+
+---
+
+## Attempt 4: Height as Primary, ETD/Weight as Hard Filters
+
+**Key change**: Removed all numeric weights. Made height the PRIMARY criterion (like greedy). ETD and weight are now hard skip rules, vessel/port are tiebreakers for equal height only.
+
+**Logic:**
+1. Hard skip: top_etd < inc_etd (we'd block it)
+2. Hard skip: lighter on heavier (ship vessels only)
+3. Among valid stacks: pick SHORTEST (greedy core)
+4. Tiebreaker for equal height: same vessel → same port
+
+**Result on train data:**
+- Reshuffles/retrieval: **0.8875** — meaningful improvement but still above greedy (0.7873)
+
+**What went wrong:**
+ETD hard filtering sometimes forced us onto TALLER stacks when the shortest stacks had early-ETD containers on top (which we'd skip). Greedy uses those short stacks freely. We traded "fewer ETD violations" for "taller stacks" — not always a good trade.
+
+**Key realization:**
+Manual weight tuning is hitting a wall. Decided to stop iterating on weights and move to a fundamentally different strategy. XGBoost will handle weight learning in Phase 2.
+
+---
+
+## Attempt 5: ETD-Block Assignment (v5)
+
+**Fundamental change in thinking**: Stop scoring stacks globally. Instead, assign each container to a DEDICATED BLOCK based on its departure_time, then use greedy within that block.
+
+**Block assignment:**
+- Ship vessels (VSL001-018): 8 blocks (B01-B08), 2-day ETD windows cycle through blocks
+- Truck vessels (VSL019-020): B09, B10
+
+**Within assigned block:**
+- Hard skip: top departs >1 day before us
+- Hard skip: lighter on heavier (ship only)
+- Pick globally shortest valid stack (greedy within block)
+- Tiebreaker: same vessel, then same port
+
+**Why this should work:**
+All containers for a vessel end up in the same block (same ETD → same block). During LOAD, vessel containers are already geographically grouped. With weight ordering maintained within stacks, reshuffles ≈ 0 for vessel loading.
+
+This is what the problem rubric calls "departure-time-aware" (~0.30-0.40, 17-21 pts).
+
+**Result on train data:**
+- Reshuffles/retrieval: **0.9860** — worst result yet (even worse than v1)
+- Speed: 3.96s (fastest so far, only scans one block)
+
+**What went wrong:**
+Restricting to one block removed the flexibility that makes greedy work. If the assigned block has contaminated stacks (initial-state containers with wrong ETD/weight), we're stuck with bad options. The spill-over logic helps but creates disorganized placements. Block assignment is the wrong abstraction.
+
+**Key lesson:** Every time we overrode greedy's global height-first search with a constraint (ETD hard skip, block restriction), the score got WORSE. Greedy wins because it finds the globally shortest stack. We need to preserve that while adding domain knowledge.
+
+---
+
+## Attempt 6: Greedy + Domain Tiebreakers (v6)
+
+**Final heuristic approach.** Stop fighting greedy. Join it.
+
+Keep greedy's height-first logic (always pick globally shortest stack) and add domain knowledge ONLY as tiebreakers for equal-height stacks:
+
+```
+Primary  : shortest height  (greedy — never compromised)
+Tie 1    : top ETD >= incoming ETD  (no ETD violation on top)
+Tie 2    : same vessel
+Tie 3    : same port
+Tie 4    : weight ordering correct (ship only)
+```
+
+No hard skip rules. No block restrictions. Domain knowledge nudges decisions only when height is equal — never forces a taller stack.
+
+**Result on train data:**
+- Reshuffles/retrieval: **0.8239** — best heuristic result, closest to greedy (0.7873)
+- Speed: 17.62s
+
+**Analysis:**
+Finally beat all previous attempts. The 0.0366 gap vs greedy comes from tiebreakers occasionally preferring a vessel-matched stack over the first-found equal-height stack, creating slight non-uniformity vs greedy's perfectly uniform distribution.
+
+**Decision: Stop heuristic iteration. Move to XGBoost.**
+v6 is good enough to generate meaningful training data. XGBoost will learn the weights we've been guessing manually. The heuristic's job is done.
