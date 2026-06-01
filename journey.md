@@ -176,4 +176,26 @@ v6 is good enough to generate meaningful training data. XGBoost will learn the w
 
 **Model:** XGBRegressor, n_estimators=400, max_depth=6, lr=0.05, subsample=0.8
 
+**Training result:**
+- Val RMSE: 0.6925 (best was 0.6689 at step 50 — model overfit after that)
+- Val MAE: 0.4890 vs baseline 0.6559 — learning real signal
+
+**Feature importances learned:**
+- stack_height: 54% — confirms greedy's core insight
+- same_vessel: 8%, same_port: 6%, days_until_dep: 6%, block_occ: 6%
+- top_etd_gap_days: 5%, weight signals: ~5% each
+- is_truck: 0% — no truck examples in training data
+
+**Simulation result on train data:**
+- Reshuffles/retrieval: **0.7808** — FIRST TIME BEATING GREEDY (0.7873)!
+- Score: 0.8 / 30 (just crossed the threshold)
+
+**Issue identified:** Model overfits badly. RMSE peaks at step 50 (0.669) then degrades to 0.693 by step 399. We're training 350 unnecessary trees that hurt generalization.
+
+---
+
+### Phase 2 — Attempt 2: XGBoost with Early Stopping
+
+**Fix:** Add `early_stopping_rounds=30` — stop training when val RMSE doesn't improve for 30 rounds. Model will stop around step ~80 instead of 400, using only the genuinely useful trees.
+
 *Result pending...*

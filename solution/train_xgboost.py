@@ -48,7 +48,7 @@ def main():
 
     # ── Train ──────────────────────────────────────────────────────────────────
     model = XGBRegressor(
-        n_estimators=400,
+        n_estimators=1000,       # high ceiling — early stopping will cut it
         max_depth=6,
         learning_rate=0.05,
         subsample=0.8,
@@ -60,6 +60,7 @@ def main():
         random_state=42,
         n_jobs=-1,
         eval_metric="rmse",
+        early_stopping_rounds=30,  # stop if val RMSE doesn't improve for 30 rounds
     )
 
     model.fit(
@@ -67,6 +68,7 @@ def main():
         eval_set=[(X_val, y_val)],
         verbose=50,
     )
+    print(f"Best iteration: {model.best_iteration} | Best val RMSE: {model.best_score:.4f}")
 
     # ── Evaluate ───────────────────────────────────────────────────────────────
     val_pred = model.predict(X_val)
