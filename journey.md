@@ -196,6 +196,19 @@ v6 is good enough to generate meaningful training data. XGBoost will learn the w
 
 ### Phase 2 — Attempt 2: XGBoost with Early Stopping
 
-**Fix:** Add `early_stopping_rounds=30` — stop training when val RMSE doesn't improve for 30 rounds. Model will stop around step ~80 instead of 400, using only the genuinely useful trees.
+**Fix:** `early_stopping_rounds=30`, stopped at best iteration 60, val RMSE 0.6681.
 
-*Result pending...*
+**Simulation result on train data:**
+- Reshuffles/retrieval: **0.7897** — WORSE than attempt 1 (0.7808), slightly worse than greedy (0.7873)
+
+**Why early stopping hurt:**
+With only 5929 training examples, the trees from step 60-400 weren't just noise — they were capturing real but subtle patterns. Early stopping cut off useful signal. The 400-tree model's slight overfitting to training distribution actually generalizes better to the sequential simulation.
+
+**Bigger issue identified:**
+stack_height importance increased from 54% → 67% with early stopping. This means the model is essentially learning "shorter = better" (greedy's rule) and not much else. Training data generated from v6 heuristic already avoids ETD/vessel mistakes (as tiebreakers), so XGBoost sees little variance in those features → weak signal.
+
+**Root cause of being stuck near greedy:**
+Training data from v6 = few ETD violations in features → XGBoost has little to learn beyond height.
+Fix: regenerate training data using GREEDY (which makes random ETD/vessel mistakes) → more variance → XGBoost learns stronger ETD/vessel signal.
+
+**Decision: Regenerate training data with greedy, retrain XGBoost.**
