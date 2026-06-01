@@ -12,7 +12,7 @@ Falls back to greedy+tiebreaker (v6) if model not loaded or no candidates found.
 
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import joblib
 import numpy as np
@@ -25,11 +25,13 @@ from src.yard_state import YardState
 WEIGHT_RANK = {"HEAVY": 3, "MEDIUM": 2, "LIGHT": 1}
 TRUCK_VESSELS = {"VSL019", "VSL020"}
 MODEL_PATH = "solution/xgb_model.pkl"
+ONE_HOUR = 3_600.0
 
 FEATURES = [
     "stack_height", "top_etd_gap_days", "same_vessel", "same_port",
     "weight_ok", "weight_rank_inc", "weight_rank_top",
     "block_occ", "days_until_dep", "is_truck",
+    "unsafe_count",   # containers in stack with ETD < ours (direct reshuffle count)
 ]
 
 
@@ -38,6 +40,20 @@ class XGBStrategy(PlacementStrategy):
     def initialize(self, yard_layout: dict, initial_state: dict) -> None:
         self._etd_cache: Dict[str, float] = {}
 
+        # Precompute stack tracking for unsafe_count feature
+        self._container_etd: Dict[str, float] = {}
+        self._stack_containers: Dict[tuple, Set[str]] = {}
+
+        for c in initial_state.get("containers", []):
+            cid = c["container_id"]
+            p   = c["position"]
+            key = (p["block"], p["bay"], p["row"])
+            etd = self._etd(c.get("departure_time", ""))
+            self._container_etd[cid] = etd
+            if key not in self._stack_containers:
+                self._stack_containers[key] = set()
+            self._stack_containers[key].add(cid)
+
         # Load pre-trained model
         if os.path.exists(MODEL_PATH):
             self._model = joblib.load(MODEL_PATH)
@@ -45,6 +61,20 @@ class XGBStrategy(PlacementStrategy):
         else:
             self._model = None
             print(f"[XGBStrategy] WARNING: model not found at {MODEL_PATH} — using v6 fallback")
+
+    def _unsafe_count(self, block: str, bay: int, row: int, inc_etd: float) -> int:
+        key = (block, bay, row)
+        return sum(
+            1 for cid in self._stack_containers.get(key, set())
+            if self._container_etd.get(cid, float("inf")) < inc_etd - ONE_HOUR
+        )
+
+    def on_container_retrieved(self, container_id: str, position: Position,
+                                reshuffles: int) -> None:
+        key = (position.block, position.bay, position.row)
+        if key in self._stack_containers:
+            self._stack_containers[key].discard(container_id)
+        self._container_etd.pop(container_id, None)
 
     # ── ETD helper ─────────────────────────────────────────────────────────────
 
@@ -73,6 +103,7 @@ class XGBStrategy(PlacementStrategy):
         days_until_dep: float,
         is_truck: int,
         event: Event,
+        unsafe_cnt: int = 0,
     ) -> dict:
         top_etd_gap = 0.0
         same_vessel  = 0
@@ -107,6 +138,7 @@ class XGBStrategy(PlacementStrategy):
             "block_occ":        round(block_occ, 4),
             "days_until_dep":   round(days_until_dep, 4),
             "is_truck":         is_truck,
+            "unsafe_count":     unsafe_cnt,
         }
 
     # ── Main placement ─────────────────────────────────────────────────────────
@@ -155,11 +187,13 @@ class XGBStrategy(PlacementStrategy):
             rows = []
             positions = []
             for h, bn, bay, row in filtered:
+                uc = self._unsafe_count(bn, bay, row, inc_etd)
                 feat = self._stack_features(
                     yard_state, bn, bay, row, h,
                     inc_etd, inc_rank,
                     block_occ_map[bn],
                     days_until_dep, is_truck, event,
+                    unsafe_cnt=uc,
                 )
                 rows.append(feat)
                 positions.append(Position(bn, bay, row, h + 1))
@@ -167,7 +201,17 @@ class XGBStrategy(PlacementStrategy):
             X = pd.DataFrame(rows, columns=FEATURES)
             preds = self._model.predict(X)
             best_idx = int(np.argmin(preds))
-            return positions[best_idx]
+            chosen = positions[best_idx]
+
+            # Update stack tracking
+            key = (chosen.block, chosen.bay, chosen.row)
+            cid = event.container_id
+            self._container_etd[cid] = inc_etd
+            if key not in self._stack_containers:
+                self._stack_containers[key] = set()
+            self._stack_containers[key].add(cid)
+
+            return chosen
 
         # ── v6 fallback (no model) ─────────────────────────────────────────────
         return self._v6_fallback(yard_state, event, inc_etd, inc_rank)

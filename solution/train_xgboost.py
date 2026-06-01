@@ -25,6 +25,7 @@ FEATURES = [
     "block_occ",
     "days_until_dep",
     "is_truck",
+    "unsafe_count",   # NEW: containers in stack with ETD < ours (direct reshuffle count)
 ]
 TARGET = "reshuffles"
 
