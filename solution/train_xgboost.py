@@ -15,17 +15,18 @@ from sklearn.metrics import mean_squared_error
 from xgboost import XGBRegressor
 
 FEATURES = [
-    "stack_height",
-    "top_etd_gap_days",
-    "same_vessel",
-    "same_port",
-    "weight_ok",
-    "weight_rank_inc",
-    "weight_rank_top",
-    "block_occ",
-    "days_until_dep",
-    "is_truck",
-    "unsafe_count",   # NEW: containers in stack with ETD < ours (direct reshuffle count)
+    # Core
+    "stack_height", "top_etd_gap_days", "same_vessel", "same_port",
+    "weight_ok", "weight_rank_inc", "weight_rank_top",
+    "block_occ", "days_until_dep", "is_truck", "unsafe_count",
+    # New: retrieval rank
+    "port_order", "weight_offset", "intra_vessel_rank",
+    # New: stack conflict
+    "unsafe_rank_count", "free_slots", "rank_gap_to_top",
+    # New: interaction
+    "unsafe_x_height",
+    # New: yard context
+    "min_height_pct",
 ]
 TARGET = "reshuffles"
 
