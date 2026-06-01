@@ -41,9 +41,9 @@ WEIGHT_OFFSET = {"HEAVY": 0, "MEDIUM": 1, "LIGHT": 2}
 TRUCK_VESSELS = {"VSL019", "VSL020"}
 SCHEDULE_PATH = "data/vessel_schedule.json"
 
-MAX_CANDIDATES      = 8    # beam width: candidates to simulate
-LOOKAHEAD_HOURS     = 72   # hours ahead to look for upcoming vessel loads
-MAX_RETRIEVE_SIM    = 40   # max upcoming containers to simulate reshuffles for
+MAX_CANDIDATES      = 5    # beam width: candidates to simulate
+LOOKAHEAD_HOURS     = 48   # hours ahead to look for upcoming vessel loads
+MAX_RETRIEVE_SIM    = 25   # max upcoming containers to simulate reshuffles for
 PORT_STEP           = 200.0
 WEIGHT_STEP         = 60.0
 ONE_HOUR            = 3_600.0
@@ -211,12 +211,16 @@ class BeamSearchStrategy(PlacementStrategy):
         if min_h == float("inf"):
             return []
 
-        # Collect all min-height positions, sorted by a quick pre-score
-        # (safe stacks first, then by rank compatibility)
+        # Cache block occupancies once
+        block_occ = {}
+        for bn, bi in yard_state.blocks.items():
+            occ, cap = yard_state.get_block_occupancy(bn)
+            block_occ[bn] = occ / cap if cap > 0 else 0.0
+
+        # Collect all min-height positions, sorted by block occupancy
         candidates = []
         for block_name, bi in yard_state.blocks.items():
-            occ, cap = yard_state.get_block_occupancy(block_name)
-            occ_ratio = occ / cap if cap > 0 else 0.0
+            occ_ratio = block_occ[block_name]
             for bay in range(1, bi.bays + 1):
                 for row in range(1, bi.rows + 1):
                     h = yard_state.get_stack_height(block_name, bay, row)
