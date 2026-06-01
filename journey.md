@@ -267,3 +267,38 @@ LOAD events = 75% of retrievals. If same-vessel containers are grouped and weigh
 ### Phase 3 — Attempt 1: Vessel-Block Assignment + Weight Ordering + Initial-State Avoidance
 
 *Result pending...*
+
+---
+
+## Phase 4: OR-Tools CP-SAT Solver
+
+**What changed in thinking:**
+Previous phases tried to score or group containers heuristically. The fundamental problem: every hard rule restricting which stacks to use forces containers to taller stacks → worse than greedy.
+
+**Deep Learning vs OR-Tools:**
+- Deep RL: learns a policy through trial and error, needs millions of episodes, weeks to train. Not feasible here.
+- OR-Tools CP-SAT: writes constraints as math equations, solver finds the EXACT optimal solution in seconds. No training data needed.
+- For this problem: OR-Tools is the right tool.
+
+**Two-phase approach:**
+
+*Phase A (pre-assignment):*
+  - Read vessel_schedule.json
+  - CP-SAT assigns each of 18 vessels to one of 8 ship blocks
+  - Constraint: vessels with OVERLAPPING LOAD WINDOWS must be in different blocks
+  - This ensures when vessel A loads from Block B01, vessel B's containers are in B02 (no cross-vessel interference)
+
+*Phase B (per placement):*
+  - Route container to vessel's assigned block
+  - Within block: same vessel+port grouping + weight ordering
+  - Empty-stack-first: never place on initial-state stacks (prevents contamination)
+
+**Why this should work:**
+  LOAD events (75% of retrievals) retrieve one vessel at a time from one block.
+  If all vessel A containers are in Block B01, weight-ordered:
+    HEAVY retrieved first (on top) → 0 reshuffles → cascade cleanly.
+  Different blocks for different vessels → no cross-vessel interference.
+
+### Phase 4 — Attempt 1: CP-SAT block assignment + vessel+port grouping
+
+*Result pending...*
