@@ -69,6 +69,11 @@ def run_simulation(strategy_path: str, data_dir: str = "data/train") -> float:
     sim = Simulator(yard, strategy, verbose=False)
     stats = sim.run(events)
 
+    # Explicitly save training data (atexit only fires on process exit,
+    # not between iterations when running inside the loop)
+    if hasattr(strategy, "_save"):
+        strategy._save()
+
     return stats.reshuffles_per_retrieval
 
 
