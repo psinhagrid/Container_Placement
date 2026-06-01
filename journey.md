@@ -1,5 +1,15 @@
 # Container Placement — Journey Log
 
+---
+
+## Phase 1: Heuristic (Manual Weight Tuning)
+
+**Goal**: Build a scoring function that places containers intelligently using domain knowledge.
+**Outcome**: Best score 0.8239 reshuffles/retrieval (train). Could never beat greedy (0.7873).
+**Lesson**: Manual weight tuning is guesswork. ETD hard rules that override height balance always hurt. Greedy's global shortest-stack search is hard to beat manually.
+
+---
+
 ## Attempt 1: Heuristic with Guessed Weights
 
 **Strategy**: Score every candidate stack on 5 signals — ETD ordering, vessel grouping, port grouping, weight ordering, stack height.
@@ -135,3 +145,35 @@ Finally beat all previous attempts. The 0.0366 gap vs greedy comes from tiebreak
 
 **Decision: Stop heuristic iteration. Move to XGBoost.**
 v6 is good enough to generate meaningful training data. XGBoost will learn the weights we've been guessing manually. The heuristic's job is done.
+
+---
+
+## Phase 2: XGBoost (Learned Score Function)
+
+**Goal**: Train XGBoost to predict reshuffles for any candidate stack, using features collected from the Phase 1 heuristic simulation. Use it to score candidates at inference time instead of hand-tuned weights.
+
+**Why XGBoost beats manual weights:**
+- We collected 5,929 labeled examples: (stack features at placement time → actual reshuffles)
+- XGBoost learns the real relationship from data — no guessing
+- At inference: find all shortest valid stacks, batch-predict reshuffles, pick argmin
+
+**Training data summary:**
+- Rows: 5,929 placements that were placed AND retrieved during train simulation
+- Features: stack_height, top_etd_gap_days, same_vessel, same_port, weight_ok, weight_rank_inc, weight_rank_top, block_occ, days_until_dep, is_truck
+- Label: reshuffles (0=3552, 1=1675, 2=568, 3=134)
+- Note: is_truck always 0 (truck containers not retrieved in train window)
+
+**Inference strategy (xgb_strategy.py):**
+1. Find global minimum stack height across all valid stacks
+2. Collect all candidates at min_height and min_height+1
+3. Batch-predict reshuffles with XGBoost for all candidates
+4. Return position with lowest predicted reshuffles
+5. Falls back to v6 heuristic if model unavailable
+
+---
+
+### Phase 2 — Attempt 1: XGBoost Regressor (400 trees, depth 6)
+
+**Model:** XGBRegressor, n_estimators=400, max_depth=6, lr=0.05, subsample=0.8
+
+*Result pending...*
