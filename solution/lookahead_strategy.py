@@ -31,7 +31,7 @@ from src.yard_state import YardState
 
 WEIGHT_RANK = {"HEAVY": 3, "MEDIUM": 2, "LIGHT": 1}
 TRUCK_VESSELS = {"VSL019", "VSL020"}
-LOOKAHEAD_K = 500  # look ahead 500 upcoming retrieval events
+LOOKAHEAD_K = 9999  # look ahead effectively all remaining retrieval events
 
 
 class LookaheadStrategy(PlacementStrategy):
