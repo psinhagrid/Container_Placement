@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.installed.cfg
+*.egg-link
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# ML / data artifacts
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.model
+models/
+checkpoints/
+
+# Large data files — keep schema files, ignore raw dumps
+data/train/events.jsonl
+data/test/events.jsonl
+data/train/initial_state.json
+data/test/initial_state.json
+
+# Results (committed intentionally, not auto-ignored)
+# results/results.json  ← keep this tracked
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/
+*.tmp
