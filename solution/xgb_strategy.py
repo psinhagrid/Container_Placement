@@ -146,9 +146,9 @@ class XGBStrategy(PlacementStrategy):
         if not candidates or min_h == float("inf"):
             return self._fallback(yard_state)
 
-        # Keep candidates within min_h .. min_h+1 (enough variety, manageable count)
-        max_h_allowed = min_h + 1
-        filtered = [(h, bn, bay, row) for h, bn, bay, row in candidates if h <= max_h_allowed]
+        # Only score candidates at exact min height — never sacrifice height balance
+        # (allowing min_h+1 lets XGBoost pick taller stacks, which always hurts)
+        filtered = [(h, bn, bay, row) for h, bn, bay, row in candidates if h == min_h]
 
         # ── XGBoost scoring ────────────────────────────────────────────────────
         if self._model is not None and filtered:
