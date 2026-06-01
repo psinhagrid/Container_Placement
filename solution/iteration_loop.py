@@ -80,6 +80,8 @@ def run_simulation(strategy_path: str, data_dir: str = "data/train") -> float:
 def retrain(accum_csv: str) -> float:
     """Retrain XGBoost on accumulated data. Returns val RMSE."""
     df = pd.read_csv(accum_csv)
+    # Drop rows with NaN/inf in any column (can happen from column mismatch in old files)
+    df = df.replace([float("inf"), float("-inf")], float("nan")).dropna()
     print(f"  Training on {len(df):,} accumulated rows")
 
     X = df[FEATURES]
