@@ -409,3 +409,42 @@ lookahead_strategy.py, ortools_strategy.py, vessel_port_strategy.py, etd_smart_s
 ### Phase 5 — Attempt 3: Ranked Strategy
 
 *Result pending...*
+
+---
+
+## Phase 5 — Feature Engineering Results Summary
+
+### Feature Evolution
+| Version | Features | Val RMSE | Train Score |
+|---|---|---|---|
+| Original XGBoost | 11 | 0.7006 | 0.7664 |
+| + unsafe_count | 11 | 0.7006 | 0.7691 |
+| + 8 new features | 19 | 0.6799 | **0.7624** (best) |
+| + 3 more (hours/group/initial) | 22 | 0.6774 | 0.7689 |
+| - 4 redundant (free_slots/is_truck/port_order/weight_offset) | 18 | **0.6742** | 0.7690 |
+
+**Key insight:** Val RMSE improved consistently but simulation score peaked at 19 features.
+Gap between val RMSE and simulation score = overfitting signal with 5929 training rows.
+
+### What each feature added
+- `unsafe_count`: direct ETD conflict count → most impactful single addition
+- `intra_vessel_rank`: exact loading position (port*3 + weight) → replaced port_order + weight_offset
+- `hours_until_load`: urgency timing signal → jumped from 3.2% to 4.3% importance after cleanup
+- `same_group_in_stack`: exact vessel+port+weight grouping quality → subsumed same_vessel + same_port
+- `initial_below_count`: initial-state bottleneck awareness → 2.99% importance
+
+### Features removed (redundant)
+- `free_slots` = 5 - stack_height (exact linear transform, zero new info)
+- `is_truck` = 0.00% importance (no signal)
+- `port_order` and `weight_offset` = both already encoded in `intra_vessel_rank`
+
+### Root cause of plateau
+Training data: only 5929 rows. With 18 features: 329 rows/feature.
+Val RMSE keeps improving but doesn't translate to simulation because:
+1. Small dataset → slight overfitting to training scenarios
+2. Self-improvement loop hasn't run yet (critical next step)
+3. Iteration loop should push to 30K+ rows → better generalization
+
+### Next: Iteration Loop
+Run 5 iterations of: collect (XGBoost + 10% exploration) → retrain → evaluate
+Expected result: simulation score improves each iteration as training data grows.
