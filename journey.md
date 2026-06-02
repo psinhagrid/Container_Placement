@@ -674,3 +674,71 @@ Collection scores also improved each round (0.7582→0.7487) — model generates
 Val RMSE still falling — not fully saturated. More rounds would likely yield further improvement.
 
 Test result: pending...
+
+---
+
+## Phase 5 — Path A: Restore 18 Features + Shuffle
+
+**Setup:** Restore same_vessel, same_port, weight_ok → 18 features total.
+Hypothesis: our best test score (0.7326) used 19 features including these 3.
+With shuffle training + more data, might beat 0.7318.
+
+**Why 18 features (not 15):**
+The 19-feat greedy-only model scored 0.7326 test (still competitive).
+same_vessel + same_port + weight_ok may capture test-specific signals.
+Removing them hurt test: 0.7326 → 0.7405 (regression).
+Restoring them + shuffle training = best of both worlds.
+
+**Path A currently running:** parallel_collector 3 workers × 10 rounds.
+Result pending...
+
+---
+
+## Strategy Analysis: Better ML Approaches
+
+### XGBoost Ranking Objective (most promising next step)
+**Current:** predict reshuffles as number (regression) → pick argmin
+**Better:** directly rank candidates → pick best (classification of ordering)
+
+```
+XGBRegressor: "Stack A will cause 1.2 reshuffles, Stack B: 1.4 reshuffles"
+XGBRanker:    "Stack A is better than Stack B for this placement"
+```
+
+Why ranking is better: we care about RELATIVE ordering of candidates, not
+absolute reshuffle counts. Ranking objectives optimize this directly.
+Implementation: XGBRanker with rank:pairwise objective.
+Requires: group information (which candidates competed at each decision).
+
+### Ensemble of 15-feat and 18-feat models
+Average predictions from both models.
+Models learned different patterns → ensemble often beats either alone.
+Very easy to implement: 1-2 lines in xgb_strategy.py.
+
+### Better feature: expected_pile_ons
+Use vessel schedule to estimate how many containers will arrive for vessels
+loading AFTER our container. These will pile on top of our container.
+More precise than current features which only look at current state.
+
+### Honest ceiling assessment
+With XGBoost regression on current features: ~0.70-0.72 on test (13-15/40)
+For 25+ (0.45): requires RL with thousands of episodes, or fundamentally
+different placement strategy (not achievable in remaining time)
+
+---
+
+## Next: Event Order Shuffling (after Path A)
+
+**Implementation plan:**
+1. Group events by vessel rotation (discharge + load as a unit)
+2. Shuffle which vessel arrives first while keeping: LOAD(X) always after DISCHARGE(X)
+3. Each worker gets different vessel arrival order + different position shuffle
+4. Creates genuinely different event sequences → more diverse training scenarios
+
+**Why this extends the learning curve:**
+Current workers: same events in same order, different starting yard
+After event shuffle: different vessel arrival sequence + different starting yard
+→ Model truly can't memorize position OR arrival-order-specific patterns
+→ Must learn: ETD ordering, vessel grouping, weight ordering (universal)
+
+**Expected impact:** Extends saturation point further → more improvement rounds possible
