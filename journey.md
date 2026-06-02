@@ -448,3 +448,47 @@ Val RMSE keeps improving but doesn't translate to simulation because:
 ### Next: Iteration Loop
 Run 5 iterations of: collect (XGBoost + 10% exploration) → retrain → evaluate
 Expected result: simulation score improves each iteration as training data grows.
+
+---
+
+### Phase 5 — Self-Improvement Loop Results
+
+**5 iterations, each adding ~6,000 rows:**
+
+| Iteration | Training Rows | Val RMSE | Train Score |
+|---|---|---|---|
+| Baseline | 5,929 | 0.6742 | 0.7690 |
+| 1 | 11,858 | 0.6008 | 0.7621 ✓ |
+| 2 | 17,787 | 0.6071 | 0.7587 ✓ |
+| 3 | 23,716 | 0.6188 | 0.7547 ✓ |
+| 4 | 29,645 | 0.6042 | 0.7530 ✓ |
+| 5 | 35,574 | **0.5807** | **0.7472** ✓ |
+
+Every iteration improved. Total train improvement: 0.7690 → 0.7472 (2.8%).
+
+**Test result: 0.7383 (12.6/40)**
+Previous best test: 0.7326 (12.9/40) — slight regression on test.
+
+Key finding: train-test gap shrank from 0.030 → 0.009, meaning the model
+is MORE CONSISTENT but the iteration loop learned some train-specific patterns.
+The test initial state (days 21-40) has different distribution than train (days 1-20).
+
+**Root cause of test regression:**
+Iteration loop only sees training simulation. Model slightly overfits to train
+yard dynamics. Val RMSE improved dramatically (0.6742→0.5807) but test score
+didn't follow because test has different initial state.
+
+---
+
+### Phase 5 — Attempt: Feature Pruning (Option A)
+
+**Goal:** Remove 3 features that are redundant now that same_group_in_stack exists:
+- `same_vessel` (2.59%): subsumed by same_group_in_stack (more specific)
+- `same_port` (2.76%): subsumed by same_group_in_stack
+- `weight_ok` (2.60%): subsumed by weight_rank_inc + weight_rank_top
+
+**Hypothesis:** With 35,574 rows, removing redundant features reduces overfitting noise
+and allows remaining features to get cleaner signals.
+18 features → 15 features.
+
+*Result pending...*
