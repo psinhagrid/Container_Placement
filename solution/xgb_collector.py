@@ -27,7 +27,7 @@ MODEL_PATH    = "solution/xgb_model.pkl"
 SCHEDULE_PATH = "data/vessel_schedule.json"
 ACCUM_CSV     = "data/train/placement_features_accum.csv"
 ONE_HOUR      = 3_600.0
-EXPLORE_RATE  = 0.20
+EXPLORE_RATE  = 0.15
 
 FEATURE_COLS = [
     "stack_height", "top_etd_gap_days",
