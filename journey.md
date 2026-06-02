@@ -492,3 +492,58 @@ and allows remaining features to get cleaner signals.
 18 features → 15 features.
 
 *Result pending...*
+
+---
+
+## Phase 5 — Parallel Collection + Initial State Shuffling
+
+### Results Summary
+| Config | Best Train | Notes |
+|---|---|---|
+| 15-feat, 20%, sequential | 0.7515 | Saturated at iteration 2 |
+| 15-feat, 20%, parallel 3W | **0.7448** | New best — shuffle helped |
+| 15-feat, 15%, parallel+shuffle | running... | |
+
+### Key Finding: Saturation Pattern
+Sequential loop with 20%: peaks at ~24K rows then overfits.
+Root cause: same initial_state.json every run → model memorizes position-specific patterns.
+Solution: shuffle initial container POSITIONS each round.
+
+### Initial State Shuffler (game-changer insight from user)
+Keep same container IDs (events.jsonl still works) but randomize physical positions.
+Result: model MUST learn actual features (ETD, vessel, weight) not yard-specific shortcuts.
+Tested: 4800 containers, IDs preserved, 100% positions changed.
+
+Round 1-2 (no shuffle): model overfits → Round 2 reverts
+Round 3+ (with shuffle): keeps improving → Round 3 gave new best 0.7448
+
+### Variance Analysis
+What changes with shuffle: initial stack compositions, block densities, feature values
+What stays fixed: events.jsonl (same event sequence always)
+Result: meaningful variance for first ~2000 events, cascades but fades mid-simulation
+
+---
+
+## Phase 5 — Future Data Diversity Roadmap
+
+### 1. Vessel Arrival Order Shuffling (next to implement)
+Group events by vessel rotation. Shuffle which vessel discharges first.
+Constraint: each vessel's DISCHARGE must always precede its own LOAD.
+Impact: model learns placement principles independent of vessel arrival order.
+Complexity: medium — need to reconstruct valid event sequence.
+
+### 2. Bootstrap Initial State Sampling (easy)
+Randomly sample N of 4800 initial containers per worker (instead of all 4800).
+Creates different yard density/fullness scenarios.
+Model learns to handle varying yard occupancy levels.
+
+### 3. NOT using test data for training (confirmed)
+Test initial_state.json is for final evaluation only. Never use for training.
+
+### Key Lesson
+The fundamental training bottleneck is fixed event sequence + fixed initial state.
+Each diversity technique extends the learning curve before saturation:
+  Position shuffle: +2-3 rounds before saturation
+  Event order shuffle: potentially +3-5 more rounds
+  Bootstrap sampling: +1-2 more rounds
+Combined: model learns genuinely generalizable placement principles
