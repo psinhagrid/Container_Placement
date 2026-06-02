@@ -38,7 +38,11 @@ RESULTS_LOG = "results/iteration_log.json"
 FEATURES = [
     "stack_height", "top_etd_gap_days", "same_vessel", "same_port",
     "weight_ok", "weight_rank_inc", "weight_rank_top",
-    "block_occ", "days_until_dep", "is_truck", "unsafe_count",
+    "block_occ", "days_until_dep", "unsafe_count",
+    "intra_vessel_rank",
+    "unsafe_rank_count", "rank_gap_to_top",
+    "unsafe_x_height", "min_height_pct",
+    "hours_until_load", "same_group_in_stack", "initial_below_count",
 ]
 
 
