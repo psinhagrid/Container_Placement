@@ -31,6 +31,7 @@ EXPLORE_RATE  = 0.15
 
 FEATURE_COLS = [
     "stack_height", "top_etd_gap_days",
+    "same_vessel", "same_port", "weight_ok",
     "weight_rank_inc", "weight_rank_top",
     "block_occ", "days_until_dep", "unsafe_count",
     "intra_vessel_rank",
@@ -243,6 +244,9 @@ class XGBCollector(PlacementStrategy):
             rows.append({
                 "stack_height":       h,
                 "top_etd_gap_days":   top_etd_gap,
+                "same_vessel":        same_vessel,
+                "same_port":          same_port,
+                "weight_ok":          weight_ok,
                 "weight_rank_inc":    inc_rank,
                 "weight_rank_top":    top_rank,
                 "block_occ":          round(block_occ[bn], 4),

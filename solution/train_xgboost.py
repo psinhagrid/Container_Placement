@@ -16,6 +16,7 @@ from xgboost import XGBRegressor
 
 FEATURES = [
     "stack_height", "top_etd_gap_days",
+    "same_vessel", "same_port", "weight_ok",
     "weight_rank_inc", "weight_rank_top",
     "block_occ", "days_until_dep", "unsafe_count",
     "intra_vessel_rank",
