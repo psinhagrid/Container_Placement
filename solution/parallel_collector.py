@@ -34,21 +34,13 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
 
+from solution.features import FEATURES
+
 ACCUM_CSV   = "data/train/placement_features_accum.csv"
 MODEL_PATH  = "solution/xgb_model.pkl"
 BACKUP_PATH = "solution/xgb_model_backup.pkl"
 RESULTS_LOG = "results/parallel_log.json"
 TEMP_DIR    = "data/train/parallel_tmp"
-
-FEATURES = [
-    "stack_height", "top_etd_gap_days",
-    "weight_rank_inc", "weight_rank_top",
-    "block_occ", "days_until_dep", "unsafe_count",
-    "intra_vessel_rank",
-    "unsafe_rank_count", "rank_gap_to_top",
-    "unsafe_x_height", "min_height_pct",
-    "hours_until_load", "same_group_in_stack", "initial_below_count",
-]
 
 
 # ── Worker function (must be top-level for multiprocessing) ────────────────────

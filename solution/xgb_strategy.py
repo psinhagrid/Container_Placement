@@ -22,6 +22,7 @@ import pandas as pd
 from src.models import Event, Position
 from src.placement_interface import PlacementStrategy
 from src.yard_state import YardState
+from solution.features import FEATURES
 
 WEIGHT_RANK   = {"HEAVY": 3, "MEDIUM": 2, "LIGHT": 1}
 WEIGHT_OFFSET = {"HEAVY": 0, "MEDIUM": 1, "LIGHT": 2}
@@ -29,17 +30,6 @@ TRUCK_VESSELS = {"VSL019", "VSL020"}
 MODEL_PATH    = "solution/xgb_model.pkl"
 SCHEDULE_PATH = "data/vessel_schedule.json"
 ONE_HOUR      = 3_600.0
-
-FEATURES = [
-    "stack_height", "top_etd_gap_days",
-    "same_vessel", "same_port", "weight_ok",
-    "weight_rank_inc", "weight_rank_top",
-    "block_occ", "days_until_dep", "unsafe_count",
-    "intra_vessel_rank",
-    "unsafe_rank_count", "rank_gap_to_top",
-    "unsafe_x_height", "min_height_pct",
-    "hours_until_load", "same_group_in_stack", "initial_below_count",
-]
 
 
 class XGBStrategy(PlacementStrategy):

@@ -14,17 +14,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from xgboost import XGBRegressor
 
-FEATURES = [
-    "stack_height", "top_etd_gap_days",
-    "same_vessel", "same_port", "weight_ok",
-    "weight_rank_inc", "weight_rank_top",
-    "block_occ", "days_until_dep", "unsafe_count",
-    "intra_vessel_rank",
-    "unsafe_rank_count", "rank_gap_to_top",
-    "unsafe_x_height", "min_height_pct",
-    "hours_until_load", "same_group_in_stack", "initial_below_count",
-]
-TARGET = "reshuffles"
+from solution.features import FEATURES, TARGET
 
 DATA_PATH  = "data/train/placement_features.csv"
 MODEL_PATH = "solution/xgb_model.pkl"
