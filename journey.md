@@ -150,3 +150,39 @@ Train-test gap: 0.7342 - 0.7318 = **0.0024** (nearly zero — excellent generali
 3. **XGBoost Ranking objective** — predict candidate ranking instead of absolute reshuffles. More aligned with actual goal.
 4. **Ensemble** — combine 15-feat and 18-feat models (average predictions).
 5. **docs/design.md** — qualitative deliverable, write after final score.
+
+---
+
+## Phase 6 — Path A Results: 18 Features + Shuffle
+
+**10 rounds, 18 features, 15% exploration, shuffled initial states.**
+
+| Round | Rows | Val RMSE | Train Score |
+|---|---|---|---|
+| R1 | 24K | 0.6204 | 0.7630 ✓ |
+| R2 | 42K | 0.5788 | 0.7489 ✓ |
+| R3 | 59K | 0.5633 | 0.7461 ✓ |
+| R4 | 77K | 0.5501 | 0.7448 ✓ |
+| R5 | 95K | 0.5440 | 0.7408 ✓ |
+| **R6** | **113K** | 0.5417 | **0.7336 ✓ breakthrough** |
+| R7 | 130K | 0.5380 | 0.7429 ✗ |
+| R8 | 148K | 0.5252 | 0.7414 ✗ |
+| R9 | 166K | 0.5252 | 0.7341 ✗ |
+| **R10** | **184K** | 0.5291 | **0.7328 ✓ new best** |
+
+**Test result: 0.7260 (13.2/40) — NEW ALL-TIME BEST**
+
+Previous best test: 0.7318 (12.9/40) — 56 fewer reshuffles.
+Train-test gap: 0.0068 — excellent generalization.
+
+Restoring same_vessel + same_port + weight_ok was the right call.
+These features capture signals that transfer well to the test distribution.
+
+## Updated Results Summary
+
+| Model | Train | Test | Score |
+|---|---|---|---|
+| Greedy baseline | 0.7873 | 0.7687 | 11.3/40 |
+| 19-feat greedy only | 0.7624 | 0.7326 | 12.9/40 |
+| 15-feat + shuffle (255K) | 0.7342 | 0.7318 | 12.9/40 |
+| **18-feat + shuffle (184K)** | **0.7328** | **0.7260** | **13.2/40 ← BEST** |
