@@ -46,7 +46,8 @@ TEMP_DIR    = "data/train/parallel_tmp"
 # ── Worker function (must be top-level for multiprocessing) ────────────────────
 
 def run_worker(worker_id: int, seed: int, output_path: str,
-               shuffle_state: bool = True) -> Tuple[float, int]:
+               shuffle_state: bool = True,
+               shuffle_events: bool = True) -> Tuple[float, int]:
     """Run one collection simulation with a unique random seed and shuffled initial state.
 
     Each worker sees:
@@ -78,13 +79,19 @@ def run_worker(worker_id: int, seed: int, output_path: str,
     else:
         initial_state = original_state
 
+    events = read_events("data/train/events.jsonl")
+
+    # Optionally shuffle the discharge ORDER within each vessel rotation
+    if shuffle_events:
+        from solution.event_order_shuffler import shuffle_discharge_order
+        events = shuffle_discharge_order(events, seed=seed + 10000)
+        print(f"  [Worker {worker_id}] Using shuffled discharge order (seed={seed+10000})")
+
     yard = YardState(yard_layout)
     yard.load_initial_state(initial_state)
     strategy = XGBCollector()
     strategy.initialize(yard_layout, initial_state)
 
-    from src.event_reader import read_events
-    events = read_events("data/train/events.jsonl")
     sim = Simulator(yard, strategy, verbose=False)
     stats = sim.run(events)
 
@@ -164,6 +171,8 @@ def main():
     parser.add_argument("--data-dir",   default="data/train")
     parser.add_argument("--no-shuffle", action="store_true",
                         help="Disable initial state shuffling (use original for all workers)")
+    parser.add_argument("--no-event-shuffle", action="store_true",
+                        help="Disable event order shuffling")
     args = parser.parse_args()
 
     os.makedirs(TEMP_DIR, exist_ok=True)
@@ -194,11 +203,14 @@ def main():
         scores, row_counts = [], []
 
         shuffle = not args.no_shuffle
+        shuffle_events = not args.no_event_shuffle
         if shuffle:
             print(f"  Using shuffled initial states (different yard per worker)")
+        if shuffle_events:
+            print(f"  Using shuffled discharge order (different event sequence per worker)")
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
             futures = {
-                executor.submit(run_worker, i, seeds[i], worker_files[i], shuffle): i
+                executor.submit(run_worker, i, seeds[i], worker_files[i], shuffle, shuffle_events): i
                 for i in range(args.workers)
             }
             for future in as_completed(futures):
@@ -241,6 +253,10 @@ def main():
               f"  {'✓ IMPROVED' if improved else '✗ reverting'}")
 
         if improved:
+            # Save old best as ensemble candidate before it gets overwritten next round
+            if os.path.exists(MODEL_PATH):
+                shutil.copy(MODEL_PATH, "solution/xgb_model_ensemble.pkl")
+                print(f"  Hall-of-fame: saved previous best → xgb_model_ensemble.pkl")
             best_score = new_score
         else:
             if os.path.exists(BACKUP_PATH):
