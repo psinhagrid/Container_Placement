@@ -1,0 +1,47 @@
+[
+  {
+    "iteration": 1,
+    "collect_score": 0.775350249828549,
+    "val_rmse": 0.6121443944107232,
+    "eval_score": 0.7597727050063682,
+    "improved": true,
+    "best_score": 0.7597727050063682,
+    "total_rows": 17787
+  },
+  {
+    "iteration": 2,
+    "collect_score": 0.7642794160869991,
+    "val_rmse": 0.6133960136923048,
+    "eval_score": 0.751543058685216,
+    "improved": true,
+    "best_score": 0.751543058685216,
+    "total_rows": 23716
+  },
+  {
+    "iteration": 3,
+    "collect_score": 0.7626138924267659,
+    "val_rmse": 0.5908824697645796,
+    "eval_score": 0.7535024982854903,
+    "improved": false,
+    "best_score": 0.751543058685216,
+    "total_rows": 29645
+  },
+  {
+    "iteration": 4,
+    "collect_score": 0.7609483687665328,
+    "val_rmse": 0.5803968152850109,
+    "eval_score": 0.7532085823454492,
+    "improved": false,
+    "best_score": 0.751543058685216,
+    "total_rows": 35574
+  },
+  {
+    "iteration": 5,
+    "collect_score": 0.7643773880670128,
+    "val_rmse": 0.5670075834868541,
+    "eval_score": 0.7537964142255315,
+    "improved": false,
+    "best_score": 0.751543058685216,
+    "total_rows": 41503
+  }
+]

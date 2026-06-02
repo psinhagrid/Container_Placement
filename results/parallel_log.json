@@ -1,0 +1,202 @@
+[
+  {
+    "round": 1,
+    "workers": 3,
+    "avg_collection_score": 0.7474935501779824,
+    "val_rmse": 0.6065099083160923,
+    "eval_score": 0.7537964142255315,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 23716
+  },
+  {
+    "round": 2,
+    "workers": 3,
+    "avg_collection_score": 0.7530779530387642,
+    "val_rmse": 0.5582574409458808,
+    "eval_score": 0.7521308905652984,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 41503
+  },
+  {
+    "round": 3,
+    "workers": 3,
+    "avg_collection_score": 0.7525227784853531,
+    "val_rmse": 0.5474689801342447,
+    "eval_score": 0.7534045263054766,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 59290
+  },
+  {
+    "round": 4,
+    "workers": 3,
+    "avg_collection_score": 0.7422683779105842,
+    "val_rmse": 0.5337718049559828,
+    "eval_score": 0.7609483687665328,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 77077
+  },
+  {
+    "round": 5,
+    "workers": 3,
+    "avg_collection_score": 0.7496815910649555,
+    "val_rmse": 0.5240903344212658,
+    "eval_score": 0.7492897031449005,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 94864
+  },
+  {
+    "round": 6,
+    "workers": 3,
+    "avg_collection_score": 0.7541556448189152,
+    "val_rmse": 0.5241421027251959,
+    "eval_score": 0.7510531987851474,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 112651
+  },
+  {
+    "round": 7,
+    "workers": 3,
+    "avg_collection_score": 0.7475588648313249,
+    "val_rmse": 0.523428027159708,
+    "eval_score": 0.7460566278044479,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 130438
+  },
+  {
+    "round": 8,
+    "workers": 3,
+    "avg_collection_score": 0.7434440416707488,
+    "val_rmse": 0.5121227458467734,
+    "eval_score": 0.7478201234446948,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 148225
+  },
+  {
+    "round": 9,
+    "workers": 3,
+    "avg_collection_score": 0.750726625518435,
+    "val_rmse": 0.5196476319129912,
+    "eval_score": 0.7498775350249829,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 166012
+  },
+  {
+    "round": 10,
+    "workers": 3,
+    "avg_collection_score": 0.7451748799843245,
+    "val_rmse": 0.5131744853971184,
+    "eval_score": 0.7437053002841187,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 183799
+  },
+  {
+    "round": 11,
+    "workers": 3,
+    "avg_collection_score": 0.7450442506776396,
+    "val_rmse": 0.515655651151334,
+    "eval_score": 0.7454687959243657,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 201586
+  },
+  {
+    "round": 12,
+    "workers": 3,
+    "avg_collection_score": 0.7486692139381471,
+    "val_rmse": 0.5130990445006759,
+    "eval_score": 0.749485647104928,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 219373
+  },
+  {
+    "round": 13,
+    "workers": 3,
+    "avg_collection_score": 0.7494203324515856,
+    "val_rmse": 0.5109990815221099,
+    "eval_score": 0.7425296365239541,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 237160
+  },
+  {
+    "round": 14,
+    "workers": 3,
+    "avg_collection_score": 0.7428235524639953,
+    "val_rmse": 0.5109036002640808,
+    "eval_score": 0.7478201234446948,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 254947
+  },
+  {
+    "round": 15,
+    "workers": 3,
+    "avg_collection_score": 0.7540903301655727,
+    "val_rmse": 0.51267024586293,
+    "eval_score": 0.744293132164201,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 272734
+  },
+  {
+    "round": 16,
+    "workers": 3,
+    "avg_collection_score": 0.7521308905652982,
+    "val_rmse": 0.5112842009534022,
+    "eval_score": 0.745370823944352,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 290521
+  },
+  {
+    "round": 17,
+    "workers": 3,
+    "avg_collection_score": 0.7518369746252572,
+    "val_rmse": 0.5109095901647881,
+    "eval_score": 0.7441951601841873,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 308308
+  },
+  {
+    "round": 18,
+    "workers": 3,
+    "avg_collection_score": 0.7430194964240228,
+    "val_rmse": 0.5071471306674306,
+    "eval_score": 0.7390026452434604,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 326095
+  },
+  {
+    "round": 19,
+    "workers": 3,
+    "avg_collection_score": 0.7496815910649555,
+    "val_rmse": 0.5073588943045956,
+    "eval_score": 0.7375330655432546,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 343882
+  },
+  {
+    "round": 20,
+    "workers": 3,
+    "avg_collection_score": 0.7533392116521341,
+    "val_rmse": 0.5099412481477918,
+    "eval_score": 0.7446850200842559,
+    "improved": false,
+    "best_score": 0.7244048202214167,
+    "total_rows": 361669
+  }
+]
