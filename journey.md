@@ -186,3 +186,37 @@ These features capture signals that transfer well to the test distribution.
 | 19-feat greedy only | 0.7624 | 0.7326 | 12.9/40 |
 | 15-feat + shuffle (255K) | 0.7342 | 0.7318 | 12.9/40 |
 | **18-feat + shuffle (184K)** | **0.7328** | **0.7260** | **13.2/40 ← BEST** |
+
+---
+
+## Phase 7: Event Order Shuffling + Ensemble
+
+### Event Order Shuffling
+Added second diversity layer to parallel workers:
+- Position shuffle: randomize WHERE each container starts in the yard
+- Event order shuffle (NEW): randomize WHICH container arrives first within each vessel rotation
+  - HEAVY for VSL001 might arrive first in one worker, LIGHT first in another
+  - Model can't memorize "HEAVY always first" → learns general timing principles
+  - Constraint preserved: all containers still discharged and loaded correctly
+
+Workers now get triple diversity: position shuffle + event order shuffle + random exploration.
+This extends the saturation point further → more rounds remain productive.
+
+### Ensemble Strategy
+Built ensemble_strategy.py:
+- Loads two model checkpoints: current best + previous best (saved on each breakthrough)
+- Averages predictions from both for each candidate
+- Falls back to single model if only one checkpoint exists
+- Previous best saved automatically during parallel_collector breakthroughs
+
+### CP-SAT Vessel Stacking (planned next)
+Identified as path to 25+:
+- Use OR-Tools to find optimal stack arrangement for each vessel before it loads
+- Loading order is deterministic (port-by-port, HEAVY first) → CP-SAT can plan for 0 reshuffles
+- LOAD events = 75% of retrievals → near-0 for LOAD → estimated 36/40
+
+### Single Source of Truth for Features
+Created solution/features.py:
+- All 6 pipeline files import FEATURES from one place
+- Never again will stale hardcoded lists cause the 1.1157 bug
+- Add/remove features in ONE file, everything else updates automatically
