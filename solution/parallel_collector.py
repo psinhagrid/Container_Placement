@@ -53,11 +53,16 @@ FEATURES = [
 
 # ── Worker function (must be top-level for multiprocessing) ────────────────────
 
-def run_worker(worker_id: int, seed: int, output_path: str) -> Tuple[float, int]:
-    """Run one collection simulation with a unique random seed.
+def run_worker(worker_id: int, seed: int, output_path: str,
+               shuffle_state: bool = True) -> Tuple[float, int]:
+    """Run one collection simulation with a unique random seed and shuffled initial state.
 
-    Each worker sees a different exploration path through the yard state,
-    generating diverse training examples that complement each other.
+    Each worker sees:
+      1. A different shuffled initial yard state (different starting configuration)
+      2. Different exploration choices (different random seed)
+
+    This gives genuinely diverse training scenarios, not just different exploration paths
+    through the same yard. The model learns universal placement principles.
     """
     import random
     random.seed(seed)   # unique seed → unique exploration choices
@@ -71,7 +76,15 @@ def run_worker(worker_id: int, seed: int, output_path: str) -> Tuple[float, int]
     with open("data/yard_layout.json") as f:
         yard_layout = _json.load(f)
     with open("data/train/initial_state.json") as f:
-        initial_state = _json.load(f)
+        original_state = _json.load(f)
+
+    # KEY CHANGE: each worker starts from a different shuffled initial state
+    if shuffle_state:
+        from solution.initial_state_shuffler import shuffle_initial_state
+        initial_state = shuffle_initial_state(original_state, seed=seed)
+        print(f"  [Worker {worker_id}] Using shuffled initial state (seed={seed})")
+    else:
+        initial_state = original_state
 
     yard = YardState(yard_layout)
     yard.load_initial_state(initial_state)
@@ -157,6 +170,8 @@ def main():
     parser.add_argument("--rounds",     type=int, default=5,
                         help="Number of collection+retrain rounds")
     parser.add_argument("--data-dir",   default="data/train")
+    parser.add_argument("--no-shuffle", action="store_true",
+                        help="Disable initial state shuffling (use original for all workers)")
     args = parser.parse_args()
 
     os.makedirs(TEMP_DIR, exist_ok=True)
@@ -186,9 +201,12 @@ def main():
         t0 = time.time()
         scores, row_counts = [], []
 
+        shuffle = not args.no_shuffle
+        if shuffle:
+            print(f"  Using shuffled initial states (different yard per worker)")
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
             futures = {
-                executor.submit(run_worker, i, seeds[i], worker_files[i]): i
+                executor.submit(run_worker, i, seeds[i], worker_files[i], shuffle): i
                 for i in range(args.workers)
             }
             for future in as_completed(futures):
