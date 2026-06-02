@@ -19,14 +19,18 @@ FEATURES = [
     "stack_height", "top_etd_gap_days", "same_vessel", "same_port",
     "weight_ok", "weight_rank_inc", "weight_rank_top",
     "block_occ", "days_until_dep", "is_truck", "unsafe_count",
-    # New: retrieval rank
+    # Retrieval rank
     "port_order", "weight_offset", "intra_vessel_rank",
-    # New: stack conflict
+    # Stack conflict
     "unsafe_rank_count", "free_slots", "rank_gap_to_top",
-    # New: interaction
+    # Interaction
     "unsafe_x_height",
-    # New: yard context
+    # Yard context
     "min_height_pct",
+    # Timing & grouping (new)
+    "hours_until_load",       # hours until vessel LOAD event — urgency signal
+    "same_group_in_stack",    # same (vessel,port,weight) containers already there
+    "initial_below_count",    # initial-state containers below us with earlier ETD
 ]
 TARGET = "reshuffles"
 

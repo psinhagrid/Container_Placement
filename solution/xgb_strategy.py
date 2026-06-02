@@ -37,6 +37,7 @@ FEATURES = [
     "port_order", "weight_offset", "intra_vessel_rank",
     "unsafe_rank_count", "free_slots", "rank_gap_to_top",
     "unsafe_x_height", "min_height_pct",
+    "hours_until_load", "same_group_in_stack", "initial_below_count",
 ]
 
 
@@ -47,11 +48,24 @@ class XGBStrategy(PlacementStrategy):
 
         # Load vessel schedule for port order features
         self._vessel_ports: Dict[str, List[str]] = {}
+        sched: dict = {}
         if os.path.exists(SCHEDULE_PATH):
             with open(SCHEDULE_PATH) as f:
                 sched = json.load(f)
             for v in sched.get("vessels", []):
                 self._vessel_ports[v["vessel_id"]] = v.get("ports", [])
+
+        # Build vessel rotation load windows for hours_until_load feature
+        self._vessel_rotations: Dict[str, List[dict]] = {}
+        for v in sched.get("vessels", []):
+            vid = v["vessel_id"]
+            rots = []
+            for rot in v.get("rotations", []):
+                ls = self._parse_ts(rot.get("load_start", ""))
+                etd_ts = self._parse_ts(rot.get("etd", ""))
+                if ls > 0:
+                    rots.append({"etd_ts": etd_ts, "load_start_ts": ls})
+            self._vessel_rotations[vid] = rots
 
         # Precompute stack tracking
         self._container_etd:         Dict[str, float] = {}
@@ -70,6 +84,12 @@ class XGBStrategy(PlacementStrategy):
             self._container_intra_rank[cid] = ir
             self._stack_containers.setdefault(key, set()).add(cid)
 
+        # Track initial container IDs for initial_below_count feature
+        self._initial_cids: Set[str] = {
+            c["container_id"] for c in initial_state.get("containers", [])
+        }
+        self._current_time: float = 0.0
+
         # Load pre-trained model
         if os.path.exists(MODEL_PATH):
             self._model = joblib.load(MODEL_PATH)
@@ -77,6 +97,17 @@ class XGBStrategy(PlacementStrategy):
         else:
             self._model = None
             print(f"[XGBStrategy] WARNING: model not found at {MODEL_PATH} — using v6 fallback")
+
+    def _parse_ts(self, s: str) -> float:
+        try:
+            return datetime.fromisoformat(s).timestamp()
+        except Exception:
+            return 0.0
+
+    def on_event(self, event: Event) -> None:
+        ts = self._parse_ts(event.timestamp)
+        if ts > 0:
+            self._current_time = ts
 
     def _intra_rank(self, vessel_id: str, port: str, weight: str) -> int:
         if vessel_id in TRUCK_VESSELS:
@@ -108,6 +139,38 @@ class XGBStrategy(PlacementStrategy):
         self._container_etd.pop(container_id, None)
         self._container_intra_rank.pop(container_id, None)
 
+    def _hours_until_load(self, vessel_id: str, etd_ts: float) -> float:
+        """Hours until this container's vessel load window. Capped at 240h."""
+        if vessel_id in TRUCK_VESSELS or self._current_time == 0:
+            return 240.0
+        best = 240.0
+        for rot in self._vessel_rotations.get(vessel_id, []):
+            if abs(rot["etd_ts"] - etd_ts) < 3600:  # match by ETD proximity
+                ls = rot["load_start_ts"]
+                hours = max(0.0, (ls - self._current_time) / 3600)
+                best = min(best, hours)
+        return round(best, 2)
+
+    def _same_group_in_stack(self, block: str, bay: int, row: int,
+                              inc_etd: float, inc_ir: int) -> int:
+        """Containers in stack with same (vessel, port, weight) as incoming."""
+        key = (block, bay, row)
+        return sum(
+            1 for cid in self._stack_containers.get(key, set())
+            if abs(self._container_etd.get(cid, float("inf")) - inc_etd) < ONE_HOUR
+            and self._container_intra_rank.get(cid, -1) == inc_ir
+        )
+
+    def _initial_below_count(self, block: str, bay: int, row: int,
+                               inc_etd: float) -> int:
+        """Initial-state containers in stack with ETD < ours (contribute to bottleneck)."""
+        key = (block, bay, row)
+        return sum(
+            1 for cid in self._stack_containers.get(key, set())
+            if cid in self._initial_cids
+            and self._container_etd.get(cid, float("inf")) < inc_etd - ONE_HOUR
+        )
+
     # ── ETD helper ─────────────────────────────────────────────────────────────
 
     def _etd(self, s: str) -> float:
@@ -136,6 +199,7 @@ class XGBStrategy(PlacementStrategy):
         is_truck: int,
         event: Event,
         unsafe_cnt: int = 0,
+        min_height_pct: float = 0.0,
     ) -> dict:
         top_etd_gap = 0.0
         same_vessel  = 0
@@ -194,7 +258,10 @@ class XGBStrategy(PlacementStrategy):
             "free_slots":         5 - h,
             "rank_gap_to_top":    float(inc_ir - top_ir),
             "unsafe_x_height":    unsafe_cnt * h,
-            "min_height_pct":     0.0,  # computed below in place_container
+            "min_height_pct":     min_height_pct,
+            "hours_until_load":   self._hours_until_load(event.vessel_id, inc_etd),
+            "same_group_in_stack": self._same_group_in_stack(block, bay, row, inc_etd, inc_ir),
+            "initial_below_count": self._initial_below_count(block, bay, row, inc_etd),
         }
 
     # ── Main placement ─────────────────────────────────────────────────────────
@@ -235,8 +302,12 @@ class XGBStrategy(PlacementStrategy):
             return self._fallback(yard_state)
 
         # Only score candidates at exact min height — never sacrifice height balance
-        # (allowing min_h+1 lets XGBoost pick taller stacks, which always hurts)
         filtered = [(h, bn, bay, row) for h, bn, bay, row in candidates if h == min_h]
+
+        # Compute min_height_pct for yard context feature (same as in collectors)
+        min_h_count  = sum(1 for h, bn, bay, row in candidates if h == min_h)
+        total_open   = len(candidates)
+        mh_pct       = round(min_h_count / max(total_open, 1), 4)
 
         # ── XGBoost scoring ────────────────────────────────────────────────────
         if self._model is not None and filtered:
@@ -250,6 +321,7 @@ class XGBStrategy(PlacementStrategy):
                     block_occ_map[bn],
                     days_until_dep, is_truck, event,
                     unsafe_cnt=uc,
+                    min_height_pct=mh_pct,
                 )
                 rows.append(feat)
                 positions.append(Position(bn, bay, row, h + 1))
@@ -260,15 +332,14 @@ class XGBStrategy(PlacementStrategy):
             chosen = positions[best_idx]
 
             # Update stack tracking
-            key = (chosen.block, chosen.bay, chosen.row)
-            cid = event.container_id
-            inc_etd = self._etd(event.departure_time)
-            inc_ir  = self._intra_rank(event.vessel_id,
-                                        event.port_of_discharge,
-                                        event.weight_class)
-            self._container_etd[cid]        = inc_etd
-            self._container_intra_rank[cid] = inc_ir
-            self._stack_containers.setdefault(key, set()).add(cid)
+            inc_ir = self._intra_rank(event.vessel_id,
+                                      event.port_of_discharge,
+                                      event.weight_class)
+            self._container_etd[event.container_id] = inc_etd
+            self._container_intra_rank[event.container_id] = inc_ir
+            self._stack_containers.setdefault(
+                (chosen.block, chosen.bay, chosen.row), set()
+            ).add(event.container_id)
 
             return chosen
 
@@ -345,6 +416,3 @@ class XGBStrategy(PlacementStrategy):
                         return Position(block_name, bay, row, h + 1)
         return Position(list(yard_state.blocks.keys())[0], 1, 1, 999)
 
-    def on_container_retrieved(self, container_id: str, position: Position,
-                                reshuffles: int) -> None:
-        pass

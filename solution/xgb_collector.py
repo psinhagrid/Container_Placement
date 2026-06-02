@@ -36,6 +36,7 @@ FEATURE_COLS = [
     "port_order", "weight_offset", "intra_vessel_rank",
     "unsafe_rank_count", "free_slots", "rank_gap_to_top",
     "unsafe_x_height", "min_height_pct",
+    "hours_until_load", "same_group_in_stack", "initial_below_count",
     "reshuffles",
 ]
 
@@ -57,6 +58,28 @@ class XGBCollector(PlacementStrategy):
             for v in sched.get("vessels", []):
                 self._vessel_ports[v["vessel_id"]] = v.get("ports", [])
 
+        # Build vessel rotation load windows
+        self._vessel_rotations: dict = {}
+        if os.path.exists(SCHEDULE_PATH):
+            with open(SCHEDULE_PATH) as f:
+                sched2 = json.load(f)
+            for v in sched2.get("vessels", []):
+                vid = v["vessel_id"]
+                rots = []
+                for rot in v.get("rotations", []):
+                    try:
+                        ls = datetime.fromisoformat(rot.get("load_start", "")).timestamp()
+                        etd_ts = datetime.fromisoformat(rot.get("etd", "")).timestamp()
+                        if ls > 0:
+                            rots.append({"etd_ts": etd_ts, "load_start_ts": ls})
+                    except Exception:
+                        pass
+                self._vessel_rotations[vid] = rots
+
+        # Track initial container IDs
+        self._initial_cids: set = {c["container_id"] for c in initial_state.get("containers", [])}
+        self._current_time: float = 0.0
+
         # Stack tracking
         self._container_etd:         Dict[str, float] = {}
         self._container_intra_rank:  Dict[str, int]   = {}
@@ -75,10 +98,19 @@ class XGBCollector(PlacementStrategy):
             self._stack_containers.setdefault(key, set()).add(cid)
 
         self._model = joblib.load(MODEL_PATH) if os.path.exists(MODEL_PATH) else None
+
         if self._model:
             print(f"[XGBCollector] Model loaded, explore_rate={EXPLORE_RATE:.0%}")
         else:
             print("[XGBCollector] No model — pure exploration")
+
+    def on_event(self, event) -> None:
+        try:
+            ts = datetime.fromisoformat(event.timestamp).timestamp()
+            if ts > 0:
+                self._current_time = ts
+        except Exception:
+            pass
 
     def _etd(self, s: str) -> float:
         if not s:
@@ -96,6 +128,33 @@ class XGBCollector(PlacementStrategy):
         ports    = self._vessel_ports.get(vessel_id, [])
         port_idx = ports.index(port) if port in ports else len(ports)
         return port_idx * 3 + WEIGHT_OFFSET.get(weight, 1)
+
+    def _hours_until_load(self, vessel_id: str, etd_ts: float) -> float:
+        if vessel_id in TRUCK_VESSELS or self._current_time == 0:
+            return 240.0
+        best = 240.0
+        for rot in self._vessel_rotations.get(vessel_id, []):
+            if abs(rot["etd_ts"] - etd_ts) < 3600:
+                hours = max(0.0, (rot["load_start_ts"] - self._current_time) / 3600)
+                best = min(best, hours)
+        return round(best, 2)
+
+    def _same_group_in_stack(self, block: str, bay: int, row: int,
+                              inc_etd: float, inc_ir: int) -> int:
+        key = (block, bay, row)
+        return sum(
+            1 for cid in self._stack_containers.get(key, set())
+            if abs(self._container_etd.get(cid, float("inf")) - inc_etd) < 3600.0
+            and self._container_intra_rank.get(cid, -1) == inc_ir
+        )
+
+    def _initial_below_count(self, block: str, bay: int, row: int, inc_etd: float) -> int:
+        key = (block, bay, row)
+        return sum(
+            1 for cid in self._stack_containers.get(key, set())
+            if cid in self._initial_cids
+            and self._container_etd.get(cid, float("inf")) < inc_etd - 3600.0
+        )
 
     def place_container(self, yard_state: YardState, event: Event) -> Position:
         inc_etd      = self._etd(event.departure_time)
@@ -201,6 +260,9 @@ class XGBCollector(PlacementStrategy):
                 "rank_gap_to_top":    float(inc_ir - top_ir),
                 "unsafe_x_height":    unsafe_count * h,
                 "min_height_pct":     min_height_pct,
+                "hours_until_load":    self._hours_until_load(event.vessel_id, inc_etd),
+                "same_group_in_stack": self._same_group_in_stack(bn, bay, row, inc_etd, inc_ir),
+                "initial_below_count": self._initial_below_count(bn, bay, row, inc_etd),
             })
             positions.append(Position(bn, bay, row, h + 1))
 
