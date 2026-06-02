@@ -33,13 +33,11 @@ SCHEDULE_PATH = "data/vessel_schedule.json"
 ONE_HOUR = 3_600.0
 
 FEATURE_COLS = [
-    # Core (existing)
     "stack_height", "top_etd_gap_days", "same_vessel", "same_port",
     "weight_ok", "weight_rank_inc", "weight_rank_top",
-    "block_occ", "days_until_dep", "is_truck", "unsafe_count",
-    # New
-    "port_order", "weight_offset", "intra_vessel_rank",
-    "unsafe_rank_count", "free_slots", "rank_gap_to_top",
+    "block_occ", "days_until_dep", "unsafe_count",
+    "intra_vessel_rank",
+    "unsafe_rank_count", "rank_gap_to_top",
     "unsafe_x_height", "min_height_pct",
     "hours_until_load", "same_group_in_stack", "initial_below_count",
     "reshuffles",
@@ -263,7 +261,6 @@ class GreedyCollector(PlacementStrategy):
                 if self._container_intra_rank.get(cid, 0) < inc_ir
                 and self._container_etd.get(cid, float("inf")) < inc_etd + ONE_HOUR
             )
-            free_slots        = 5 - chosen_h
             rank_gap_to_top   = round(inc_ir - chosen_top_ir, 4)
             min_height_pct    = round(min_h_count / max(total_open, 1), 4)
 
@@ -277,13 +274,9 @@ class GreedyCollector(PlacementStrategy):
                 "weight_rank_top":    chosen_top_rank,
                 "block_occ":          round(block_occ, 4),
                 "days_until_dep":     round(days_until, 4),
-                "is_truck":           is_truck,
                 "unsafe_count":       unsafe_count,
-                "port_order":         inc_port_ord,
-                "weight_offset":      inc_w_off,
                 "intra_vessel_rank":  inc_ir,
                 "unsafe_rank_count":  unsafe_rank_count,
-                "free_slots":         free_slots,
                 "rank_gap_to_top":    rank_gap_to_top,
                 "unsafe_x_height":    unsafe_count * chosen_h,
                 "min_height_pct":     min_height_pct,
