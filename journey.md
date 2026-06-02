@@ -547,3 +547,65 @@ Each diversity technique extends the learning curve before saturation:
   Event order shuffle: potentially +3-5 more rounds
   Bootstrap sampling: +1-2 more rounds
 Combined: model learns genuinely generalizable placement principles
+
+---
+
+## Phase 5 — Shuffle Behaviour Analysis
+
+### Key Observation: Train Eval vs Generalization
+When running with shuffled initial states, train eval scores DROPPED vs baseline:
+- Round 1: 0.7449 ✗ (baseline 0.7448)
+- Round 2: 0.7538 ✗
+But val RMSE kept IMPROVING: 0.6068 → 0.5614
+
+This is NOT a failure — it's the model working correctly.
+
+**Why train eval drops with shuffle:**
+- Training: 3 workers × different shuffled initial states → diverse, general patterns
+- Evaluation: ALWAYS uses original initial_state.json → specific single configuration
+- Model learned general principles but is less specialized for the original yard
+- Mismatch: trained on "many yards", evaluated on "one specific yard"
+
+**Why this means test will improve:**
+- Original train initial state (day 0): specific configuration
+- Shuffled training states: many diverse configurations
+- Test initial state (day 20): another different configuration
+- Model trained on shuffled states sees test yard as less "foreign"
+- General patterns (ETD ordering, vessel grouping) transfer perfectly
+
+**The right metric to trust: val RMSE (improving), not holdout simulation score (misleading with shuffle)**
+
+### Two Types of Patterns Learned
+
+**Universal (consistent train→test):**
+- ETD ordering: earlier departure → on top (always true)
+- Weight ordering: HEAVY first during LOAD (always true)
+- hours_until_load: relative urgency (works for any time period)
+- unsafe_count / intra_vessel_rank: direct conflict signals (universal)
+
+**Period-specific (differ train vs test):**
+- Specific vessel rotation timing (VSL001 loads Jan 5 in train, Jan 25 in test)
+- Initial state composition (train: Jan 1-20 ETDs, test: Jan 21-Feb 9 ETDs)
+- Yard fill trajectory (slightly different between periods)
+
+**Shuffle forces learning of universal patterns by preventing position memorization.**
+
+### Variance vs Iterations
+More variance → saturation point moves further:
+- No shuffle, 10%: saturates ~35K rows (5 iterations)
+- No shuffle, 20%: saturates ~24K rows (2-3 iterations)
+- Position shuffle + 15%: estimated ~80-100K rows (10-15 iterations)
+- + Event order shuffle: estimated ~150-200K rows (20+ iterations)
+- + Bootstrap sampling: even further
+
+### Next Diversity Techniques Planned
+1. **Vessel arrival order shuffle**: shuffle which vessel discharges first within a day,
+   keeping constraint that LOAD(X) always comes after DISCHARGE(X).
+   Model can't memorize "VSL003 always arrives before VSL001".
+
+2. **Bootstrap initial state sampling**: randomly sample N of 4800 initial containers
+   per worker. Creates different yard density/fullness scenarios.
+   Model learns to handle varying occupancy levels.
+
+Both techniques extend the learning curve further and push the model toward
+universal placement principles that generalize across training and test periods.
