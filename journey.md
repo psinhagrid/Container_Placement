@@ -646,3 +646,31 @@ Train-test gap flipped for first time:
   + run shuffle pipeline with the fuller feature set
   → Hypothesis: those 3 features capture test-specific signals
   → Target: beat 0.7326 on test
+
+---
+
+## Phase 5 — Path B Extended (10 more rounds, 15% + shuffle)
+
+### Results
+272,734 total training rows after 10 rounds.
+Pattern: long plateau then breakthroughs at R8 and R9.
+
+| Round | Rows | Val RMSE | Sim Score |
+|---|---|---|---|
+| R1 | 112K | 0.5369 | 0.7512 ✗ |
+| R2 | 130K | 0.5308 | 0.7440 ✗ |
+| R3 | 148K | 0.5194 | 0.7456 ✗ |
+| R4 | 166K | 0.5216 | 0.7399 ✗ |
+| R5 | 184K | 0.5166 | 0.7413 ✗ |
+| R6 | 202K | 0.5184 | 0.7492 ✗ |
+| R7 | 219K | 0.5162 | 0.7438 ✗ |
+| **R8** | 237K | **0.5104** | **0.7392 ✓** |
+| **R9** | 255K | 0.5126 | **0.7342 ✓ NEW BEST** |
+| R10 | 272K | 0.5123 | 0.7366 ✗ |
+
+**New all-time best train: 0.7342** (255K rows, shuffled, 15% exploration)
+Collection scores also improved each round (0.7582→0.7487) — model generates better training data as it improves.
+
+Val RMSE still falling — not fully saturated. More rounds would likely yield further improvement.
+
+Test result: pending...
