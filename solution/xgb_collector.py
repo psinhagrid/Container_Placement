@@ -312,3 +312,14 @@ class XGBCollector(PlacementStrategy):
                 writer.writeheader()
             writer.writerows(self._training_rows)
         print(f"[XGBCollector] +{len(self._training_rows)} rows → {ACCUM_CSV}")
+
+    def save_to_path(self, path: str) -> None:
+        """Save to a specific path (used by parallel workers to avoid file conflicts)."""
+        if not self._training_rows:
+            return
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=FEATURE_COLS)
+            writer.writeheader()
+            writer.writerows(self._training_rows)
+        print(f"[XGBCollector] +{len(self._training_rows)} rows → {ACCUM_CSV}")
