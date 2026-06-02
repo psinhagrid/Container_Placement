@@ -3,50 +3,68 @@
 ## Current Best Results
 | Strategy | Train | Test | Score |
 |---|---|---|---|
-| XGBoost (18 features, greedy data) | 0.7624 | TBD | TBD |
-| XGBoost (19 features) | 0.7624 | 0.7326 | 12.9/40 |
+| XGBoost 19-feat (greedy only) | 0.7624 | **0.7326** | **12.9/40** ← best test |
+| XGBoost 18-feat + 5 iter loop | 0.7472 | 0.7383 | 12.6/40 |
+| XGBoost 15-feat (5.9K rows) | 0.7698 | — | — |
 | Greedy baseline | 0.7873 | 0.7687 | 11.3/40 |
 
 **Target: 25+ / 40**
 
 ---
 
-## NEXT ACTION: Run Iteration Loop
-The val RMSE keeps improving (0.6742 — best ever) but simulation score
-is stuck at ~0.769. Root cause: only 5929 training rows with 18 features.
-More data = better generalization.
+## Current State
+- Features: **15** (removed same_vessel, same_port, weight_ok)
+- Training data: 5,929 rows (fresh greedy, 15-feature format)
+- Accumulated CSV: 5,929 rows (loop data was lost when reseeding)
 
+---
+
+## Two Options to Run Next
+
+### Option A — Rebuild 35K rows, 10% exploration (standard)
 ```bash
-cp data/train/placement_features.csv data/train/placement_features_accum.csv
 python -m solution.iteration_loop --iterations 5
 ```
+- 5 iterations × 6K rows = 35K total with 15 clean features
+- Same as before but with 3 fewer redundant features
+- Expected: ≈ 0.7472 train or better, possibly better test
+- Risk: might still overfit to train distribution
+- Time: ~10 min
 
-Expected: each iteration adds ~6000 rows, val RMSE stays good, simulation improves.
+### Option B — Start from 5.9K, 20% exploration (more diverse)
+```bash
+# First: change line in xgb_collector.py:
+# EXPLORE_RATE = 0.20
+python -m solution.iteration_loop --iterations 5
+```
+- 20% random choices → more varied scenarios
+- Model sees more edge cases → may generalize better to test
+- Collection score slightly worse (more random) but training signal richer
+- Key reason: test has DIFFERENT initial state than train → more exploration
+  may help model be robust across different initial states
+- Time: ~10 min
+
+### Which to pick
+```
+Option A: safe, rebuilds known-good approach with cleaner features
+Option B: riskier but potentially breaks the train/test generalization gap
+          Test initial state (day 20) ≠ train initial state (day 0)
+          20% exploration generates data from more diverse yard states
+```
+→ **Try Option B first** (more interesting, addresses root cause of test gap)
+→ If worse: fall back to Option A
 
 ---
 
-## Feature Removal (DO AFTER ITERATION LOOP)
-Wait until we have 30K+ rows before removing — importances stabilize with more data.
-
-Remove (redundant — subsumed by same_group_in_stack):
-- [ ] same_vessel (2.59%): same_group_in_stack is more specific
-- [ ] same_port (2.76%): same_group_in_stack covers this
-- [ ] weight_ok (2.60%): weight_rank_inc + weight_rank_top already capture this
-
-Keep despite low % (genuinely different signals):
-- unsafe_rank_count (2.49%): rank-based vs ETD-based, different from unsafe_count
-- weight_rank_inc/top: model needs both sides of weight comparison
-
----
-
-## Features Still to Consider Adding
-- vessel_containers_in_yard: count of same-vessel containers in yard (grouping urgency)
-- stack_purity: same_vessel_count / stack_height (0-1, quality of grouping)
-- etd_rank_percentile: intra_vessel_rank normalized by vessel size
+## After Loop Completes
+- [ ] Test whichever model scores better on train
+- [ ] If beats 0.7326 on test → new best, save results
+- [ ] Consider: vessel_containers_in_yard, stack_purity features
+- [ ] Consider: 5 more iterations at whichever rate worked better
 
 ---
 
 ## Deliverables Remaining
-- [ ] results/results.json — run XGBoost on test data after loop
-- [ ] docs/design.md — write after final score is known
+- [ ] results/results.json — update after best model found
+- [ ] docs/design.md — write after final score known
 - [ ] tests/ — unit tests (optional, scored)
